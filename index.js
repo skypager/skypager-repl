@@ -34,6 +34,8 @@ const FrameworkLoader = () => lodash.attempt(() => {
 module.exports = exports = start
 
 function ProjectLoader() {
+  delete global.project
+  
   global.skypager = FrameworkLoader()
 
   Object.defineProperty(global, 'project', {
