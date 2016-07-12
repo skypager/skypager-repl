@@ -1,0 +1,37 @@
+{
+  "name": "skypager-repl",
+  "version": "4.0.2",
+  "description": "a custom tailored repl",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jon Soeder <jon@chicago.com> (https://twitter.com/soederpop)",
+  "license": "SEE LICENSE IN License.md",
+  "repository": {
+    "type": "github",
+    "url": "https://github.com/datapimp/soederpop-repl"
+  },
+  "dependencies": {
+    "babel-core": "^6.9.1",
+    "babel-preset-skypager": "^2.58.0",
+    "babel-register": "^6.9.0",
+    "babel-runtime": "^6.9.2",
+    "bluebird": "^3.4.0",
+    "cli-clear": "^1.0.4",
+    "colors": "^1.1.2",
+    "enhanced-require": "^0.5.0-beta6",
+    "enhanced-resolve": "^2.2.2",
+    "json-loader": "^0.5.4",
+    "lodash": "^4.13.1",
+    "yaml-loader": "^0.2.0"
+  },
+  "bin": {
+    "skypager-repl": "./skypager-repl"
+  },
+  "babel": {
+    "presets": [
+      "skypager"
+    ]
+  }
+}

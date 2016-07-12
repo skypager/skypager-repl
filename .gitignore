@@ -1,0 +1,8 @@
+.env
+.DS_Store
+*.swp
+node_modules/
+private/
+**/private/
+lib/
+npm-debug.log

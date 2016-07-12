@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+
+'use strict';
+
+require('babel-register')({ presets:[ 'skypager' ] })
+
+const colors = require('colors')
+const start = require('./index')({
+  prompt: 'skypager'.blue + ':'.gray + ' ',
+})
