@@ -35,13 +35,14 @@ module.exports = exports = start
 
 function ProjectLoader() {
   delete global.project
-  
+
   global.skypager = FrameworkLoader()
 
   Object.defineProperty(global, 'project', {
     enumerable: false,
     configurable: true,
     get: () => {
+      delete(global.project)
       return global.project = global.skypager.load(process.cwd())
     },
   })
