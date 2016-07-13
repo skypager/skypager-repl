@@ -5,6 +5,18 @@
 require('babel-register')({ presets:[ 'skypager' ] })
 
 const colors = require('colors')
-const start = require('./index')({
-  prompt: 'skypager'.blue + ':'.gray + ' ',
+const figlet = require('figlet')
+const argv = require('minimist')(process.argv)
+const log = console.log.bind(console)
+const skypagerRepl = require('./index')
+
+log()
+log(colors.rainbow(figlet.textSync('Skypager')))
+log()
+log()
+
+skypagerRepl.start({icon:'rocket'}, global, (err, repl) => {
+  if (err || !repl) {
+    log('There was an error', err)
+  }
 })

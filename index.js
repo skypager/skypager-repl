@@ -4,56 +4,92 @@ const repl = require('repl')
 const lodash = require('lodash')
 const exists = require('fs').existsSync
 const path = require('path')
+const argv = require('minimist')(process.argv)
+const emoji = require('node-emoji')
 
-const loader = (moduleContext, path) => moduleContext.require(path)
+/**
+ * Loads a module in the context of another module.
+ *
+ * If the moduleContext you pass in is a string, it will attempt to load a module
+ * object from require.cache
+ *
+ * @param  {module|string} moduleContext The module, or the id of a module found in require.cache
+ * @param  {[type]} path          the require expression to be required / resolved
+ * @return module
+ */
+const loader = (moduleContext, moduleId) => {
+  try {
+    return typeof moduleContext === 'string'
+      ? lodash.attempt(require(moduleContext)) && loader(require.cache[moduleContext], moduleId)
+      : moduleContext.require(moduleId)
+  } catch(error) {
+    return require('skypager-project')
+  }
+}
 
-let currentManifest = path.join(process.cwd(), 'package.json')
+const getContextPath = () => {
+  const contextRoot = argv.skypagerRoot || process.env.SKYPAGER_ROOT
+  return contextRoot
+    ? path.join(contextRoot, 'package.json')
+    : path.join(process.cwd(), 'package.json')
+}
 
-const FrameworkLoader = () => lodash.attempt(() => {
-  if (!exists(currentManifest)) {
+exports.contextPath = getContextPath
+
+const FrameworkLoader = (contextPath = getContextPath(), context = global) => lodash.attempt(() => {
+  if (!exists(contextPath)) {
     console.error('Make sure to call this from within the context of a skypager project folder with a package.json in it')
     process.exit(1)
   }
 
   // populate the require.cache in order to get a module context
-  require(currentManifest)
+  require(contextPath)
 
   // load skypager-project that would be resolved in process.cwd(), likely node_modules
-  global.skypager = loader(require.cache[currentManifest], 'skypager-project')
+  const theFramework = loader(contextPath, 'skypager-project')
 
-  if (lodash.isError(global.skypager)) {
+  if (lodash.isError(theFramework)) {
     console.error('Could not load the skypager-project library. Make sure it is in process.cwd() node_modules.')
-    console.log(global.skypager.message)
+    console.log(theFramework.message)
     process.exit(1)
   }
 
-  return global.skypager
+  return context.skypager = theFramework
 })
 
 
 module.exports = exports = start
+exports.start = start
+exports.loadFramework = FrameworkLoader
+exports.loadProject = ProjectLoader
 
-function ProjectLoader() {
-  delete global.project
 
-  global.skypager = FrameworkLoader()
+function ProjectLoader(context) {
+  context = context || global
 
-  Object.defineProperty(global, 'project', {
+  delete context.project
+
+  context.skypager = FrameworkLoader()
+
+  Object.defineProperty(context, 'project', {
     enumerable: false,
     configurable: true,
     get: () => {
-      delete(global.project)
-      return global.project = global.skypager.load(process.cwd())
+      delete(context.project)
+      return context.project = context.skypager.load(process.cwd())
     },
   })
 }
 
-function start (options, ready) {
+function start (options = {}, context = global, ready) {
+  const _currentPackage = require(getContextPath())
+  const icon = options.icon ? `${emoji.get(options.icon)} ` : ''
+
   options = lodash.defaults(options, {
     terminal: true,
     colors: true,
     ignoreUndefined: true,
-    prompt: `${((currentManifest && currentManifest.name) || 'skypager').magenta} ${'>'.grey}`,
+    prompt: `${icon}${((_currentPackage && _currentPackage.name) || 'skypager').magenta}${'>'.grey} `,
     input: process.stdin,
     output: process.stdout,
     useGlobal: true,
@@ -61,65 +97,71 @@ function start (options, ready) {
 
   const server = require('repl').start(options)
 
-  exports.promisify(server)
-
-  if (typeof ready === 'function') {
-    ready(server)
+  if (lodash.isError(server)) {
+    ready(server, null)
+    return
   }
 
   try {
-    require(process.cwd() + '/skypager-repl.js')(server)
+    exports.promisify(server)
+
+    if (exists(path.join( process.cwd() + '/skypager-repl.js' ))) {
+      require(process.cwd() + '/skypager-repl.js')(server)
+    }
+
+    ProjectLoader(options.useGlobal ? global : server.context)
+
+    server.defineCommand('cls', {
+      help: 'clear the screen',
+      action: function(){
+        require('cli-clear')()
+        this.displayPrompt()
+      },
+    })
+
+    server.defineCommand('reload', {
+      help: 'reload the skypager framework and current project',
+      action: function(){
+        let cachePaths = () => Object.keys(require.cache).filter( key => key.match(/skypager-/) || key.startsWith(context.project.root))
+
+        try {
+          context.skypager.clearProjectCache( )
+
+          cachePaths().forEach(
+            cachePath => delete(require.cache[cachePath])
+          )
+
+          const attemptReload = lodash.attempt(() => {
+            delete context.project
+            delete context.skypager
+
+            FrameworkLoader(getContextPath(), options.useGlobal ? global : server.context)
+            ProjectLoader(options.useGlobal ? global : server.context)
+          })
+
+          if (lodash.isError(attemptReload)) {
+            console.log('Failed on reload', attemptReload.error)
+            process.exit(1)
+          }
+
+          if (options.onReload && typeof options.onReload === 'function') {
+            options.onReload(context)
+          }
+
+          //require('cli-clear')()
+          this.displayPrompt()
+        } catch(error) {
+          console.log('error reloading', error, error.stack)
+          //this.displayPrompt()
+        }
+
+      },
+    })
   } catch(error) {
+    ready(error)
+    return
   }
 
-  ProjectLoader()
-
-  server.defineCommand('cls', {
-    help: 'clear the screen',
-    action: function(){
-      require('cli-clear')()
-      this.displayPrompt()
-    },
-  })
-
-  server.defineCommand('reload', {
-    help: 'reload the skypager framework and current project',
-    action: function(){
-      let cachePaths = () => Object.keys(require.cache).filter( key => key.match(/skypager-/) || key.startsWith(global.project.root))
-
-      try {
-        global.skypager.clearProjectCache( )
-
-        cachePaths().forEach(
-          cachePath => delete(require.cache[cachePath])
-        )
-
-        const attemptReload = lodash.attempt(() => {
-          delete global.project
-          delete global.skypager
-
-          FrameworkLoader()
-          ProjectLoader()
-        })
-
-        if (lodash.isError(attemptReload)) {
-          console.log('Failed on reload', attemptReload.error)
-          process.exit(1)
-        }
-
-        if (options.onReload && typeof options.onReload === 'function') {
-          options.onReload(global)
-        }
-
-        //require('cli-clear')()
-        this.displayPrompt()
-      } catch(error) {
-        console.log('error reloading', error, error.stack)
-        //this.displayPrompt()
-      }
-
-    },
-  })
 
   return server
 }
