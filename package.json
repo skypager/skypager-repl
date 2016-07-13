@@ -1,6 +1,6 @@
 {
   "name": "skypager-repl",
-  "version": "4.0.4",
+  "version": "4.0.5",
   "description": "a custom tailored repl",
   "main": "index.js",
   "scripts": {
