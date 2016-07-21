@@ -1,0 +1,9 @@
+language: node_js
+sudo: false
+dist: trusty
+node_js:
+  - "6.2"
+script: npm run build
+notifications:
+  email:
+    on_failure: change
